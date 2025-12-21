@@ -103,10 +103,21 @@ jobs:
           with open(os.environ['GITHUB_ENV'], 'a') as env_file:
               env_file.write(f"NEW_KEY={new_key}\n")
 
-      - name: Commit Changes
+      - name: Commit and Push (Safe Fix)
         run: |
           git config user.name "Limbo Bot"
           git config user.email "bot@limbo.local"
+          
+          # 1. Добавляем файлы
           git add current.gif info.json README.md
+          
+          # 2. Делаем коммит (если есть изменения)
           git commit -m "🔑 Update: ${{ env.NEW_KEY }}" || echo "Nothing to commit"
-          git push --force
+          
+          # 3. 🔥 ГЛАВНОЕ ИСПРАВЛЕНИЕ: Скачиваем обновления перед отправкой
+          # Если GitHub ругался "fetch first", эта команда это исправит
+          git pull --rebase origin main
+          
+          # 4. Теперь спокойно отправляем
+          git push origin main
+
