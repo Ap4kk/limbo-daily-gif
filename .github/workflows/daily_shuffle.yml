@@ -109,5 +109,4 @@ jobs:
           git config user.email "bot@limbo.local"
           git add current.gif info.json README.md
           git commit -m "🔑 Update: ${{ env.NEW_KEY }}" || echo "Nothing to commit"
-          git pull --rebase origin main
-          git push
+          git push --force
