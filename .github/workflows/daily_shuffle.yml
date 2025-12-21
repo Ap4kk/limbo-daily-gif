@@ -1,0 +1,34 @@
+name: Daily Limbo Shuffle
+
+on:
+  schedule:
+    # Запуск каждый день в 00:00 UTC (3:00 ночи по МСК)
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Кнопка для ручного запуска (чтобы потестить)
+
+permissions:
+  contents: write
+
+jobs:
+  shuffle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Pick random GIF
+        run: |
+          # Выбираем случайный файл из папки all_keys
+          RANDOM_FILE=$(ls all_keys/*.gif | shuf -n 1)
+          echo "Selected key: $RANDOM_FILE"
+          
+          # Копируем его поверх current.gif
+          cp "$RANDOM_FILE" current.gif
+
+      - name: Commit and Push
+        run: |
+          git config user.name "Limbo Bot"
+          git config user.email "bot@github.com"
+          git add current.gif
+          git commit -m "Daily Limbo Key Update [skip ci]" || echo "No changes"
+          git push
