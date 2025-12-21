@@ -1,34 +1,112 @@
-name: Daily Limbo Shuffle
+name: Ultimate Limbo System
 
 on:
   schedule:
-    # Запуск каждый день в 00:00 UTC (3:00 ночи по МСК)
-    - cron: '0 0 * * *'
-  workflow_dispatch: # Кнопка для ручного запуска (чтобы потестить)
+    - cron: '0 0 * * *' # 3:00 ночи по МСК
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  shuffle:
+  update-limbo:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
+      - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Pick random GIF
+      - name: The Python Brain
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        shell: python
         run: |
-          # Выбираем случайный файл из папки all_keys
-          RANDOM_FILE=$(ls all_keys/*.gif | shuf -n 1)
-          echo "Selected key: $RANDOM_FILE"
-          
-          # Копируем его поверх current.gif
-          cp "$RANDOM_FILE" current.gif
+          import os
+          import random
+          import shutil
+          import hashlib
+          import json
+          import datetime
+          import requests # Для отправки вебхука
 
-      - name: Commit and Push
+          KEYS_DIR = "all_keys"
+          TARGET_FILE = "current.gif"
+          INFO_FILE = "info.json"
+          README_FILE = "README.md"
+
+          # --- ЛОГИКА ВЫБОРА (из прошлой версии) ---
+          all_files = [f for f in os.listdir(KEYS_DIR) if f.endswith('.gif')]
+          if not all_files: exit(1)
+
+          current_hash = None
+          if os.path.exists(TARGET_FILE):
+              with open(TARGET_FILE, "rb") as f: current_hash = hashlib.md5(f.read()).hexdigest()
+
+          candidates = []
+          if current_hash:
+              for filename in all_files:
+                  with open(os.path.join(KEYS_DIR, filename), "rb") as f:
+                      if hashlib.md5(f.read()).hexdigest() != current_hash:
+                          candidates.append(filename)
+          
+          if not candidates: candidates = all_files
+          new_key = random.choice(candidates)
+          
+          # --- ДЕЙСТВИЯ ---
+          
+          # 1. Копируем файл
+          shutil.copy2(os.path.join(KEYS_DIR, new_key), TARGET_FILE)
+          
+          # 2. Создаем JSON-инфо (API)
+          data = {
+              "current_key": new_key,
+              "updated_at": datetime.datetime.utcnow().isoformat(),
+              "total_keys": len(all_files)
+          }
+          with open(INFO_FILE, "w") as f:
+              json.dump(data, f, indent=2)
+
+          # 3. Обновляем README (Борьба с кэшем GitHub)
+          # Мы добавляем случайный параметр к ссылке, чтобы GitHub показал новую картинку
+          md_content = f"""
+          # Daily Limbo Key 🔑
+          
+          Ключ обновляется автоматически каждый день в 00:00 UTC.
+          
+          ### Сегодняшний ключ: **{new_key}**
+          ![Current Key](current.gif?v={random.randint(1000,9999)})
+          """
+          with open(README_FILE, "w", encoding="utf-8") as f:
+              f.write(md_content)
+
+          # 4. Отправка в Discord (Вебхук)
+          webhook_url = os.environ.get("DISCORD_WEBHOOK")
+          if webhook_url:
+              repo_url = f"https://raw.githubusercontent.com/{os.environ.get('GITHUB_REPOSITORY')}/main/current.gif"
+              # Трюк с датой для сброса кэша Дискорда в сообщении
+              cache_buster = f"{repo_url}?v={datetime.datetime.now().timestamp()}"
+              
+              payload = {
+                  "username": "Limbo Keeper",
+                  "content": f"🔑 **Новый ключ выбран!**\nСегодня это: `{new_key}`",
+                  "embeds": [{
+                      "image": {"url": cache_buster},
+                      "color": 3066993
+                  }]
+              }
+              try:
+                  requests.post(webhook_url, json=payload)
+                  print("Webhook sent!")
+              except Exception as e:
+                  print(f"Webhook failed: {e}")
+          
+          # Сохраняем имя для коммита
+          with open(os.environ['GITHUB_ENV'], 'a') as env_file:
+              env_file.write(f"NEW_KEY={new_key}\n")
+
+      - name: Commit Changes
         run: |
           git config user.name "Limbo Bot"
-          git config user.email "bot@github.com"
-          git add current.gif
-          git commit -m "Daily Limbo Key Update [skip ci]" || echo "No changes"
+          git config user.email "bot@limbo.local"
+          git add current.gif info.json README.md
+          git commit -m "🔑 Update: ${{ env.NEW_KEY }}" || echo "Nothing to commit"
           git push
