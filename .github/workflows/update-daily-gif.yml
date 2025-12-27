@@ -1,0 +1,26 @@
+name: Update Daily GIF1
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Каждый день в полночь UTC
+  workflow_dispatch:  # Возможность запустить вручную
+
+jobs:
+  update-gif:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Select random key
+        run: |
+          KEY=$(ls all_keys/*.gif | shuf -n 1)
+          cp "$KEY" current.gif
+      
+      - name: Commit and push
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add current.gif
+          git commit -m "Update daily GIF: $(date +'%Y-%m-%d')"
+          git push
