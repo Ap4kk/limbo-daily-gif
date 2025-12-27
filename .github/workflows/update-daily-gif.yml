@@ -17,17 +17,21 @@ jobs:
         with:
           fetch-depth: 0  # Получаем всю историю для rebase
       
-      - name: Select random key
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Select daily key
         run: |
-          KEY=$(ls all_keys/*.gif | shuf -n 1)
-          cp "$KEY" current.gif
-          echo "Selected key: $KEY"
+          python select_daily_key.py
+          echo "Key selection complete!"
       
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "Update daily GIF: $(date +'%Y-%m-%d')"
-          file_pattern: 'current.gif'
+          file_pattern: 'current.gif last_key.txt'
           commit_user_name: 'github-actions[bot]'
           commit_user_email: 'github-actions[bot]@users.noreply.github.com'
           pull_options: '--rebase --autostash'
