@@ -13,10 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          persist-credentials: true
+        uses: actions/checkout@v4
       
       - name: Select random key
         run: |
@@ -24,10 +21,10 @@ jobs:
           cp "$KEY" current.gif
           echo "Selected key: $KEY"
       
-      - name: Commit and push
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add current.gif
-          git diff-index --quiet HEAD || git commit -m "Update daily GIF: $(date +'%Y-%m-%d')"
-          git push
+      - name: Commit and push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Update daily GIF: $(date +'%Y-%m-%d')"
+          file_pattern: 'current.gif'
+          commit_user_name: 'github-actions[bot]'
+          commit_user_email: 'github-actions[bot]@users.noreply.github.com'
